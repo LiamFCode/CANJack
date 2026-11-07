@@ -14,47 +14,46 @@ void setup() {
 	Serial.begin(115200);
 	Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX, -1);
 
-	CAN.setMode(MCP_LISTENONLY);
+	if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS initialization failed");
+        while (true) delay(1000);
+    }
 
-	Serial.print("BOOT,");
-	Serial.print(millis());
+    logFile = SPIFFS.open("/canlog.csv", FILE_APPEND);
+    if (!logFile) {
+        Serial.println("Could not open log file");
+        while (true) delay(1000);
+    }
+
+    Serial.println("CAN logger ready");
 }
 
 void loop() {
-	if (CAN_MSGAVAIL == CAN.checkReceive()) {
-		unsigned char len = 0;
-		unsigned char data[8] = {0};
+    while (Serial2.available()) {
+        String line = Serial2.readStringUntil('\n');
+        line.trim();
 
-		if (CAN.readMsgBuf(&len, data) == CAN_OK) {
-			unsigned long id = CAN.getCanId();
-			bool extended = CAN.isExtendedFrame();
-			bool remote = CAN.isRemoteRequest();
+        if (line.length() == 0) continue;
 
-			//seq,time_ms,id_hex,flags,dlc,data_hex
-			Serial.print(sequenceNumber++);
-			Serial.print(',');
-			Serial.print(millis());
-			Serial.print(',');
-			Serial.print(id, HEX);
-			Serial.print(',');
-			Serial.print(extended ? 1 : 0);
-			Serial.print(remote ? 1 : 0);
-			Serial.print(',');
-			Serial.print(len);
+        /*---remove-boot-marker-from-CSV-frame-log---*/
+        if (line.startsWith("BOOT,")) {
+            Serial.println(line);
+            continue;
+        }
 
-			for (byte i = 0; i < len && i < 8; i++) {
-				Serial.print(',');
-				if (data[i] < 17) {
-					Serial.print('0x');
-					Serial.print(data[i], HEX);
-				}
-			}
+        if (logFile) {
+            logFile.println(line);
+            lineCount++;
+        }
+    }
 
-			Serial.println();
-		}
-	}
+    /*---batch-write-frames---*/
+    if (millis() - lastFlush >= 1000) {
+        lastFlush = millis();
 
-	if (millis() - lastStatus >= 1000) {
-		lastStatus = millis();
-	}
+        if (logFile) logFile.flush();
+
+        Serial.print("Records written: ");
+        Serial.println(lineCount);
+    }
 }
