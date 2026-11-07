@@ -47,8 +47,8 @@ void loop() {
 
 			for (byte i = 0; i < len && i < 8; i++) {
 				Serial.print(',');
-				if (data[i] < 17) {
-					Serial.print('0x');
+				if (data[i] < 16) {
+					Serial.print('0');
 					Serial.print(data[i], HEX);
 				}
 			}
