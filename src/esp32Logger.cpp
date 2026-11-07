@@ -29,21 +29,25 @@ void setup() {
 }
 
 void loop() {
-    while (Serial2.available()) {
-        String line = Serial2.readStringUntil('\n');
-        line.trim();
-
-        if (line.length() == 0) continue;
-
-        /*---remove-boot-marker-from-CSV-frame-log---*/
-        if (line.startsWith("BOOT,")) {
-            Serial.println(line);
-            continue;
+	while (Serial2.available()) {
+        char c = Serial2.read();
+        if (c == '\n') {
+            inputLine.trim();
+            if (inputLine.length() > 0) {
+                logFile.println(inputLine);
+                lineCount++;
+                Serial.println(inputLine);
+            }
+            inputLine = "";
         }
-
-        if (logFile) {
-            logFile.println(line);
-            lineCount++;
+        else if (c != '\r') {
+            if (inputLine.length() < 128) {
+                inputLine += c;
+            }
+            else {
+                inputLine = "";
+                Serial.println("ERROR: line too long");
+            }
         }
     }
 
